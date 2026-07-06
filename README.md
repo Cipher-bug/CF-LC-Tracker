@@ -1,70 +1,47 @@
-# CP Tracker — Codeforces + LeetCode Analytics Dashboard
+# CP Tracker
 
-A dashboard that pulls your Codeforces and LeetCode data and visualizes
-rating progression, solved-problem breakdowns by tag/difficulty, and
-identifies weak topics based on your actual submission history.
+I got tired of manually checking my Codeforces and LeetCode profiles to see how I was actually doing, so I built this. A dashboard that pulls stats from both and shows rating trends, solved problems by tag/difficulty, and which topics I'm actually weak at (not just untouched).
 
-## Why this project
+## What it does
 
-Most competitive programmers track progress manually or not at all. This
-tool automates that: pull data from both platforms' public APIs, and get
-a clear picture of where you're strong, where you're weak, and how your
-rating has trended over time — instead of guessing.
+* Pulls your Codeforces rating history and plots it over time
+* Breaks down solved problems by difficulty and by tag
+* Figures out your genuinely weak topics, tags you've attempted a bunch but rarely solve, which is a better signal than just "0 solved" on tags you've never tried
+* Same idea for LeetCode: solved count by difficulty, top tags
+* Type in any handle/username in the sidebar and it fetches live, you don't need to be me to use it
 
-## Features
+## How it's built
 
-- **Codeforces**
-  - Rating history over time (line chart)
-  - Solved problems bucketed by difficulty (e.g. 800–899, 1200–1299)
-  - Solved problems by tag (graphs, dp, greedy, etc.)
-  - **Weak topic detection**: tags with a high attempt count but low solve
-    rate — a genuine signal of what to practice next, not just what you
-    haven't touched yet.
-- **LeetCode**
-  - Total solved, broken down by Easy/Medium/Hard
-  - Top tags by problems solved
+Three files, each doing one thing:
 
-## Architecture
+* `fetch_data.py` talks to the Codeforces REST API and LeetCode's GraphQL endpoint and gets the raw data
+* `analyze.py` takes that raw data and turns it into the numbers/tables the dashboard actually needs
+* `app.py` is the Streamlit UI, wires everything together
 
-```
-fetch_data.py   -> pulls raw data from Codeforces API + LeetCode GraphQL,
-                   saves to data/*.json (so you're not hitting the APIs
-                   on every dashboard refresh)
-analyze.py      -> pure functions that turn raw JSON into pandas
-                   DataFrames the dashboard can plot directly
-app.py          -> Streamlit dashboard that renders everything
-```
+Splitting it up this way made debugging way easier. When something broke, I always knew which file to look in.
 
-Keeping fetch/analyze/display separate means each piece is independently
-testable and easy to explain — e.g. in an interview you can walk through
-exactly how the weak-topic logic works without touching the UI code.
-
-## Setup
+## Running it
 
 ```bash
 git clone <your-repo-url>
 cd cf-leetcode-tracker
 pip install -r requirements.txt
-
-python fetch_data.py --cf-handle YOUR_CF_HANDLE --lc-username YOUR_LC_USERNAME
-
 streamlit run app.py
 ```
 
-This opens the dashboard in your browser at `localhost:8501`.
+Opens at `localhost:8501`. Enter a Codeforces handle and/or LeetCode username in the sidebar, hit **Fetch stats**.
 
-## Notes on the APIs used
+If you'd rather pull data via the terminal instead of the UI (e.g. to save it to a file):
+```bash
+python fetch_data.py --cf-handle YOUR_CF_HANDLE --lc-username YOUR_LC_USERNAME
+```
 
-- **Codeforces**: official public REST API (`codeforces.com/api/...`), no
-  auth required. Documented at https://codeforces.com/apiHelp
-- **LeetCode**: no official public API, but the site's own frontend uses a
-  GraphQL endpoint (`leetcode.com/graphql`) that can be queried directly
-  for public profile stats — this is the same approach used by most
-  open-source LeetCode stats tools.
+## A note on the APIs
 
-## Possible extensions
+Codeforces has an actual public API, well documented, no auth needed. LeetCode doesn't officially expose one, but their site quietly uses a GraphQL endpoint internally that you can query directly for public profile data. Pretty common trick, a lot of LeetCode stats tools out there use the same approach.
 
-- Cache historical snapshots (e.g. daily) to track week-over-week
-  improvement, not just a point-in-time snapshot
-- Add a "recommended next problems" feature based on weak tags
-- Deploy publicly via Streamlit Community Cloud
+## Ideas for later
+
+* Track stats over time instead of just a snapshot (would need to store daily/weekly history)
+* Suggest problems to try next based on weak topics
+* Deploy it properly so I don't need to run it locally every time
