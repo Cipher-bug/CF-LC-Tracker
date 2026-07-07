@@ -1,5 +1,7 @@
 # CP Tracker
 
+**Live demo:** https://cf-lc-tracker.streamlit.app/
+
 I got tired of manually checking my Codeforces and LeetCode profiles to see how I was actually doing, so I built this. A dashboard that pulls stats from both and shows rating trends, solved problems by tag/difficulty, and which topics I'm actually weak at (not just untouched).
 
 ## What it does
@@ -44,4 +46,3 @@ Codeforces has an actual public API, well documented, no auth needed. LeetCode d
 
 * Track stats over time instead of just a snapshot (would need to store daily/weekly history)
 * Suggest problems to try next based on weak topics
-* Deploy it properly so I don't need to run it locally every time
