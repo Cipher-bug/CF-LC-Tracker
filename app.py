@@ -5,7 +5,7 @@ Streamlit dashboard for Codeforces + LeetCode stats.
 Run:
     streamlit run app.py
 
-Type a Codeforces handle and/or LeetCode username in the sidebar and
+Type a Codeforces handle and/or LeetCode username in the form at the top and
 click "Fetch stats" - no need to run fetch_data.py separately anymore.
 """
 
@@ -23,7 +23,7 @@ from analyze import (
     lc_contest_rating_df,
 )
 
-st.set_page_config(page_title="CP Tracker", layout="wide", page_icon="🧩")
+st.set_page_config(page_title="CP Tracker", layout="wide", page_icon="🧩", initial_sidebar_state="collapsed")
 
 # ---------- Palette ----------
 BG_CARD = "#161B26"
@@ -172,8 +172,7 @@ st.markdown(
 )
 
 # ---------- Lookup form (main page, so it's visible on mobile without opening a sidebar) ----------
-with st.container():
-    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+with st.container(border=True):
     st.markdown("##### 🔍 Lookup")
     col_cf, col_lc = st.columns(2)
     with col_cf:
@@ -181,13 +180,8 @@ with st.container():
     with col_lc:
         lc_username = st.text_input("LeetCode username", placeholder="e.g. CipherBug")
     fetch_clicked = st.button("Fetch stats", type="primary", use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
-
-# ---------- Sidebar: kept as a shortcut for desktop users, mirrors the main form ----------
-with st.sidebar:
-    st.caption("Data pulled live via the Codeforces public API and LeetCode's GraphQL endpoint.")
 
 # session_state keeps the fetched data around across reruns,
 # so the dashboard doesn't re-fetch every time you interact with a widget
@@ -235,7 +229,7 @@ if cf_data is None and lc_data is None:
         <div class="empty-state">
             <div style="font-size:2.5rem;">🧩</div>
             <div style="font-size:1.1rem; font-weight:600; margin-top:0.5rem;">Nothing to show yet</div>
-            <div>Enter a handle/username in the sidebar and click <b>Fetch stats</b> to begin.</div>
+            <div>Enter a handle/username above and click <b>Fetch stats</b> to begin.</div>
         </div>
         """,
         unsafe_allow_html=True,
