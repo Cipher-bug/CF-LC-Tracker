@@ -11,7 +11,7 @@ click "Fetch stats" - no need to run fetch_data.py separately anymore.
 
 import streamlit as st
 
-from fetch_data import get_codeforces_data, get_leetcode_data
+from fetch_data import get_codeforces_data, get_leetcode_data, get_leetcode_contest_data
 from analyze import (
     cf_rating_history_df,
     cf_solved_by_tag,
@@ -19,6 +19,7 @@ from analyze import (
     cf_weak_tags,
     lc_solved_by_difficulty,
     lc_top_tags,
+    lc_contest_rating_df,
 )
 
 st.set_page_config(page_title="CP Tracker", layout="wide")
@@ -38,6 +39,8 @@ if "cf_data" not in st.session_state:
     st.session_state.cf_data = None
 if "lc_data" not in st.session_state:
     st.session_state.lc_data = None
+if "lc_contest_data" not in st.session_state:
+    st.session_state.lc_contest_data = None
 
 if fetch_clicked:
     if not cf_handle and not lc_username:
@@ -59,8 +62,16 @@ if fetch_clicked:
                     st.session_state.lc_data = None
                     st.sidebar.error(f"LeetCode fetch failed: {e}")
 
+            with st.spinner(f"Fetching LeetCode contest history for '{lc_username}'..."):
+                try:
+                    st.session_state.lc_contest_data = get_leetcode_contest_data(lc_username)
+                except Exception as e:
+                    st.session_state.lc_contest_data = None
+                    st.sidebar.error(f"LeetCode contest fetch failed: {e}")
+
 cf_data = st.session_state.cf_data
 lc_data = st.session_state.lc_data
+lc_contest_data = st.session_state.lc_contest_data
 
 if cf_data is None and lc_data is None:
     st.info("Enter a handle/username in the sidebar and click **Fetch stats** to begin.")
@@ -114,5 +125,29 @@ if lc_data:
         st.subheader("Top tags")
         lc_tag_df = lc_top_tags(lc_data)
         st.bar_chart(lc_tag_df.set_index("tag")["solved"])
+
+    # ---------- LeetCode contest performance ----------
+    if lc_contest_data and lc_contest_data.get("summary"):
+        st.divider()
+        st.subheader("Contest performance")
+
+        summary = lc_contest_data["summary"]
+        col5, col6, col7 = st.columns(3)
+        col5.metric("Contest rating", f"{summary['rating']:.0f}")
+        col6.metric("Global rank", f"#{summary['globalRanking']:,}")
+        col7.metric("Contests attended", summary["attendedContestsCount"])
+
+        contest_df = lc_contest_rating_df(lc_contest_data)
+        if not contest_df.empty:
+            st.line_chart(contest_df.set_index("date")["rating"])
+            st.subheader("Recent contests")
+            st.dataframe(
+                contest_df[["contest", "date", "rank", "solved", "total", "rating"]]
+                .sort_values("date", ascending=False)
+                .reset_index(drop=True),
+                use_container_width=True,
+            )
+    elif lc_contest_data is not None:
+        st.info("No rated contest history found for this LeetCode username.")
 
 st.caption("Data pulled live via Codeforces public API and LeetCode's GraphQL endpoint.")

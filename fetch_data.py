@@ -83,6 +83,61 @@ def get_leetcode_data(username: str) -> dict:
     return data["data"]["matchedUser"]
 
 
+def get_leetcode_contest_data(username: str) -> dict:
+    """
+    Fetch contest ranking summary + history for a LeetCode username.
+
+    Returns {"summary": {...} or None, "history": [...]}, where history
+    only includes contests actually attended, sorted chronologically
+    (oldest first). If the user has never entered a rated contest,
+    "summary" will be None and "history" will be empty - not an error.
+    """
+    query = """
+    query userContestRankingInfo($username: String!) {
+      userContestRanking(username: $username) {
+        attendedContestsCount
+        rating
+        globalRanking
+        totalParticipants
+        topPercentage
+      }
+      userContestRankingHistory(username: $username) {
+        attended
+        problemsSolved
+        totalProblems
+        rating
+        ranking
+        contest {
+          title
+          startTime
+        }
+      }
+    }
+    """
+    payload = {
+        "query": query,
+        "variables": {"username": username},
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Referer": f"https://leetcode.com/{username}/",
+    }
+    resp = requests.post(LC_GRAPHQL, json=payload, headers=headers, timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
+
+    result = data.get("data", {})
+    if result.get("userContestRanking") is None and result.get("userContestRankingHistory") is None:
+        raise RuntimeError(f"LeetCode user not found or API blocked response: {data}")
+
+    summary = result.get("userContestRanking")
+    history_raw = result.get("userContestRankingHistory", []) or []
+    history = [c for c in history_raw if c.get("attended")]
+    history.sort(key=lambda c: c["contest"]["startTime"])
+
+    return {"summary": summary, "history": history}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cf-handle", default="CipherBug", help="Codeforces handle")
@@ -101,6 +156,12 @@ def main():
     with open(DATA_DIR / "leetcode.json", "w") as f:
         json.dump(lc_data, f, indent=2)
     print("  -> saved LeetCode stats.")
+
+    print(f"Fetching LeetCode contest history for '{args.lc_username}'...")
+    lc_contest_data = get_leetcode_contest_data(args.lc_username)
+    with open(DATA_DIR / "leetcode_contests.json", "w") as f:
+        json.dump(lc_contest_data, f, indent=2)
+    print(f"  -> saved {len(lc_contest_data['history'])} attended contests.")
 
     print("\nDone. Run `streamlit run app.py` to view your dashboard.")
 

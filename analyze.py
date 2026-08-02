@@ -24,6 +24,11 @@ def load_leetcode():
         return json.load(f)
 
 
+def load_leetcode_contests():
+    with open(DATA_DIR / "leetcode_contests.json") as f:
+        return json.load(f)
+
+
 # ---------- Codeforces ----------
 
 def cf_rating_history_df(cf_data: dict) -> pd.DataFrame:
@@ -134,3 +139,25 @@ def lc_top_tags(lc_data: dict, top_n: int = 10) -> pd.DataFrame:
             })
     df = pd.DataFrame(all_tags).sort_values("solved", ascending=False)
     return df.head(top_n)
+
+
+def lc_contest_rating_df(lc_contest_data: dict) -> pd.DataFrame:
+    """
+    Contest rating over time, one row per attended contest.
+    Columns: date, contest, rank, solved, total, rating
+    """
+    history = lc_contest_data.get("history", []) if lc_contest_data else []
+    if not history:
+        return pd.DataFrame(columns=["date", "contest", "rank", "solved", "total", "rating"])
+
+    rows = []
+    for c in history:
+        rows.append({
+            "date": datetime.fromtimestamp(c["contest"]["startTime"]),
+            "contest": c["contest"]["title"],
+            "rank": c["ranking"],
+            "solved": c["problemsSolved"],
+            "total": c["totalProblems"],
+            "rating": c["rating"],
+        })
+    return pd.DataFrame(rows).sort_values("date")
