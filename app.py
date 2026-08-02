@@ -10,6 +10,7 @@ click "Fetch stats" - no need to run fetch_data.py separately anymore.
 """
 
 import streamlit as st
+import plotly.graph_objects as go
 
 from fetch_data import get_codeforces_data, get_leetcode_data, get_leetcode_contest_data
 from analyze import (
@@ -22,16 +23,162 @@ from analyze import (
     lc_contest_rating_df,
 )
 
-st.set_page_config(page_title="CP Tracker", layout="wide")
-st.title("Competitive Programming Tracker")
-st.caption("Enter a Codeforces handle and/or LeetCode username to see stats")
+st.set_page_config(page_title="CP Tracker", layout="wide", page_icon="🧩")
+
+# ---------- Palette ----------
+BG_CARD = "#161B26"
+ACCENT_CF = "#7C9EFF"        # blue - Codeforces
+ACCENT_LC = "#FFB067"        # amber - LeetCode
+ACCENT_CONTEST = "#7CE0C0"   # teal - Contests
+TEXT_MUTED = "#9CA3AF"
+
+# ---------- Global CSS ----------
+st.markdown(
+    f"""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+    html, body, [class*="css"]  {{
+        font-family: 'Inter', sans-serif;
+    }}
+
+    .hero-title {{
+        font-size: 2.4rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, {ACCENT_CF}, {ACCENT_CONTEST});
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.1rem;
+    }}
+    .hero-caption {{
+        color: {TEXT_MUTED};
+        font-size: 1rem;
+        margin-bottom: 1.5rem;
+    }}
+
+    .section-label {{
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: {TEXT_MUTED};
+        margin: 1.2rem 0 0.4rem 0;
+    }}
+
+    .metric-card {{
+        background-color: {BG_CARD};
+        border-radius: 14px;
+        padding: 1.1rem 1.3rem;
+        border: 1px solid rgba(255,255,255,0.06);
+    }}
+    .metric-label {{
+        font-size: 0.8rem;
+        color: {TEXT_MUTED};
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }}
+    .metric-value {{
+        font-size: 1.7rem;
+        font-weight: 800;
+        margin-top: 0.15rem;
+    }}
+
+    div[data-testid="stDataFrame"] {{
+        border-radius: 12px;
+        overflow: hidden;
+    }}
+
+    .empty-state {{
+        text-align: center;
+        padding: 3rem 1rem;
+        color: {TEXT_MUTED};
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+def metric_card(label: str, value: str, accent: str, col=None):
+    """Render a small styled metric card (replacement for st.metric)."""
+    target = col if col is not None else st
+    target.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">{label}</div>
+            <div class="metric-value" style="color:{accent}">{value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def styled_line_chart(df, x_col, y_col, color, hover_name=None, y_title=None):
+    """A Plotly line chart themed to match the dashboard."""
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=df[x_col],
+            y=df[y_col],
+            mode="lines+markers",
+            line=dict(width=3, color=color),
+            marker=dict(size=6, color=color),
+            text=df[hover_name] if hover_name else None,
+            hovertemplate=(
+                (f"<b>%{{text}}</b><br>" if hover_name else "")
+                + f"{y_title or y_col}: %{{y}}<br>%{{x|%b %d, %Y}}<extra></extra>"
+            ),
+        )
+    )
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=10, r=10, t=10, b=10),
+        height=320,
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", title=y_title or y_col),
+        font=dict(family="Inter, sans-serif", color="#E6E8EC"),
+    )
+    return fig
+
+
+def styled_bar_chart(df, x_col, y_col, color, horizontal=False):
+    """A Plotly bar chart themed to match the dashboard."""
+    fig = go.Figure()
+    if horizontal:
+        fig.add_trace(go.Bar(y=df[x_col], x=df[y_col], orientation="h", marker=dict(color=color)))
+    else:
+        fig.add_trace(go.Bar(x=df[x_col], y=df[y_col], marker=dict(color=color)))
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=10, r=10, t=10, b=10),
+        height=320,
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
+        font=dict(family="Inter, sans-serif", color="#E6E8EC"),
+    )
+    return fig
+
+
+# ---------- Hero header ----------
+st.markdown('<div class="hero-title">Competitive Programming Tracker</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="hero-caption">Live Codeforces + LeetCode stats, contest history, and weak-spot analysis.</div>',
+    unsafe_allow_html=True,
+)
 
 # ---------- Sidebar: user input ----------
 with st.sidebar:
-    st.header("Lookup")
+    st.markdown("### 🔍 Lookup")
     cf_handle = st.text_input("Codeforces handle", placeholder="e.g. CipherBug")
     lc_username = st.text_input("LeetCode username", placeholder="e.g. CipherBug")
-    fetch_clicked = st.button("Fetch stats", type="primary")
+    fetch_clicked = st.button("Fetch stats", type="primary", use_container_width=True)
+    st.markdown("---")
+    st.caption("Data pulled live via the Codeforces public API and LeetCode's GraphQL endpoint.")
 
 # session_state keeps the fetched data around across reruns,
 # so the dashboard doesn't re-fetch every time you interact with a widget
@@ -74,80 +221,130 @@ lc_data = st.session_state.lc_data
 lc_contest_data = st.session_state.lc_contest_data
 
 if cf_data is None and lc_data is None:
-    st.info("Enter a handle/username in the sidebar and click **Fetch stats** to begin.")
+    st.markdown(
+        """
+        <div class="empty-state">
+            <div style="font-size:2.5rem;">🧩</div>
+            <div style="font-size:1.1rem; font-weight:600; margin-top:0.5rem;">Nothing to show yet</div>
+            <div>Enter a handle/username in the sidebar and click <b>Fetch stats</b> to begin.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.stop()
 
-# ---------- Codeforces section ----------
+# ---------- Build tabs based on available data ----------
+tab_labels = []
 if cf_data:
-    st.header("Codeforces")
+    tab_labels.append("🟦 Codeforces")
+if lc_data:
+    tab_labels.append("🟧 LeetCode")
+if lc_contest_data and lc_contest_data.get("summary"):
+    tab_labels.append("🏆 Contests")
 
-    col1, col2 = st.columns(2)
+tabs = st.tabs(tab_labels)
+tab_idx = 0
 
-    with col1:
-        st.subheader("Rating over time")
+# ---------- Codeforces tab ----------
+if cf_data:
+    with tabs[tab_idx]:
         rating_df = cf_rating_history_df(cf_data)
+
+        st.markdown('<div class="section-label">Overview</div>', unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        current_rating = int(rating_df["rating"].iloc[-1]) if not rating_df.empty else "—"
+        metric_card("Current Rating", str(current_rating), ACCENT_CF, c1)
+        metric_card("Rated Contests", str(len(rating_df)), ACCENT_CF, c2)
+        metric_card("Handle", cf_handle or "—", ACCENT_CF, c3)
+
+        st.markdown('<div class="section-label">Rating over time</div>', unsafe_allow_html=True)
         if not rating_df.empty:
-            st.line_chart(rating_df.set_index("date")["rating"])
-            st.metric("Current rating", int(rating_df["rating"].iloc[-1]))
+            st.plotly_chart(
+                styled_line_chart(rating_df, "date", "rating", ACCENT_CF, hover_name="contest", y_title="Rating"),
+                use_container_width=True,
+            )
         else:
             st.info("No rated contests found yet.")
 
-    with col2:
-        st.subheader("Solved by difficulty bucket")
-        diff_df = cf_solved_by_difficulty(cf_data)
-        if not diff_df.empty:
-            st.bar_chart(diff_df.set_index("difficulty")["solved"])
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown('<div class="section-label">Solved by difficulty</div>', unsafe_allow_html=True)
+            diff_df = cf_solved_by_difficulty(cf_data)
+            if not diff_df.empty:
+                st.plotly_chart(
+                    styled_bar_chart(diff_df, "difficulty", "solved", ACCENT_CF),
+                    use_container_width=True,
+                )
+        with col_b:
+            st.markdown('<div class="section-label">Solved by tag</div>', unsafe_allow_html=True)
+            tag_df = cf_solved_by_tag(cf_data)
+            if not tag_df.empty:
+                st.plotly_chart(
+                    styled_bar_chart(tag_df.head(10), "tag", "solved", ACCENT_CF, horizontal=True),
+                    use_container_width=True,
+                )
 
-    st.subheader("Solved by tag")
-    tag_df = cf_solved_by_tag(cf_data)
-    if not tag_df.empty:
-        st.bar_chart(tag_df.set_index("tag")["solved"])
+        st.markdown('<div class="section-label">Weak topics (attempted a lot, low solve rate)</div>', unsafe_allow_html=True)
+        weak_df = cf_weak_tags(cf_data)
+        st.dataframe(weak_df, use_container_width=True, hide_index=True)
 
-    st.subheader("Weak topics (attempted a lot, low solve rate)")
-    weak_df = cf_weak_tags(cf_data)
-    st.dataframe(weak_df, use_container_width=True)
+    tab_idx += 1
 
-    st.divider()
-
-# ---------- LeetCode section ----------
+# ---------- LeetCode tab ----------
 if lc_data:
-    st.header("LeetCode")
-
-    col3, col4 = st.columns(2)
-
-    with col3:
-        st.subheader("Solved by difficulty")
+    with tabs[tab_idx]:
         lc_diff_df, total_solved = lc_solved_by_difficulty(lc_data)
-        st.metric("Total solved", int(total_solved))
-        st.bar_chart(lc_diff_df.set_index("difficulty")["count"])
-
-    with col4:
-        st.subheader("Top tags")
         lc_tag_df = lc_top_tags(lc_data)
-        st.bar_chart(lc_tag_df.set_index("tag")["solved"])
 
-    # ---------- LeetCode contest performance ----------
-    if lc_contest_data and lc_contest_data.get("summary"):
-        st.divider()
-        st.subheader("Contest performance")
+        st.markdown('<div class="section-label">Overview</div>', unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        metric_card("Total Solved", str(int(total_solved)), ACCENT_LC, c1)
+        metric_card("Username", lc_username or "—", ACCENT_LC, c2)
+        top_tag = lc_tag_df.iloc[0]["tag"] if not lc_tag_df.empty else "—"
+        metric_card("Top Tag", top_tag, ACCENT_LC, c3)
 
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown('<div class="section-label">Solved by difficulty</div>', unsafe_allow_html=True)
+            st.plotly_chart(
+                styled_bar_chart(lc_diff_df, "difficulty", "count", ACCENT_LC),
+                use_container_width=True,
+            )
+        with col_b:
+            st.markdown('<div class="section-label">Top tags</div>', unsafe_allow_html=True)
+            st.plotly_chart(
+                styled_bar_chart(lc_tag_df, "tag", "solved", ACCENT_LC, horizontal=True),
+                use_container_width=True,
+            )
+
+    tab_idx += 1
+
+# ---------- Contests tab ----------
+if lc_contest_data and lc_contest_data.get("summary"):
+    with tabs[tab_idx]:
         summary = lc_contest_data["summary"]
-        col5, col6, col7 = st.columns(3)
-        col5.metric("Contest rating", f"{summary['rating']:.0f}")
-        col6.metric("Global rank", f"#{summary['globalRanking']:,}")
-        col7.metric("Contests attended", summary["attendedContestsCount"])
-
         contest_df = lc_contest_rating_df(lc_contest_data)
+
+        st.markdown('<div class="section-label">Overview</div>', unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        metric_card("Contest Rating", f"{summary['rating']:.0f}", ACCENT_CONTEST, c1)
+        metric_card("Global Rank", f"#{summary['globalRanking']:,}", ACCENT_CONTEST, c2)
+        metric_card("Contests Attended", str(summary["attendedContestsCount"]), ACCENT_CONTEST, c3)
+
+        st.markdown('<div class="section-label">Rating history</div>', unsafe_allow_html=True)
         if not contest_df.empty:
-            st.line_chart(contest_df.set_index("date")["rating"])
-            st.subheader("Recent contests")
+            st.plotly_chart(
+                styled_line_chart(contest_df, "date", "rating", ACCENT_CONTEST, hover_name="contest", y_title="Rating"),
+                use_container_width=True,
+            )
+
+            st.markdown('<div class="section-label">Recent contests</div>', unsafe_allow_html=True)
             st.dataframe(
                 contest_df[["contest", "date", "rank", "solved", "total", "rating"]]
                 .sort_values("date", ascending=False)
                 .reset_index(drop=True),
                 use_container_width=True,
+                hide_index=True,
             )
-    elif lc_contest_data is not None:
-        st.info("No rated contest history found for this LeetCode username.")
-
-st.caption("Data pulled live via Codeforces public API and LeetCode's GraphQL endpoint.")
+elif lc_contest_data is not None and lc_data:
+    st.info("No rated contest history found for this LeetCode username.")
