@@ -171,13 +171,22 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------- Sidebar: user input ----------
-with st.sidebar:
-    st.markdown("### 🔍 Lookup")
-    cf_handle = st.text_input("Codeforces handle", placeholder="e.g. CipherBug")
-    lc_username = st.text_input("LeetCode username", placeholder="e.g. CipherBug")
+# ---------- Lookup form (main page, so it's visible on mobile without opening a sidebar) ----------
+with st.container():
+    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+    st.markdown("##### 🔍 Lookup")
+    col_cf, col_lc = st.columns(2)
+    with col_cf:
+        cf_handle = st.text_input("Codeforces handle", placeholder="e.g. CipherBug")
+    with col_lc:
+        lc_username = st.text_input("LeetCode username", placeholder="e.g. CipherBug")
     fetch_clicked = st.button("Fetch stats", type="primary", use_container_width=True)
-    st.markdown("---")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ---------- Sidebar: kept as a shortcut for desktop users, mirrors the main form ----------
+with st.sidebar:
     st.caption("Data pulled live via the Codeforces public API and LeetCode's GraphQL endpoint.")
 
 # session_state keeps the fetched data around across reruns,
@@ -191,7 +200,7 @@ if "lc_contest_data" not in st.session_state:
 
 if fetch_clicked:
     if not cf_handle and not lc_username:
-        st.sidebar.warning("Enter at least one handle/username.")
+        st.warning("Enter at least one handle/username.")
     else:
         if cf_handle:
             with st.spinner(f"Fetching Codeforces data for '{cf_handle}'..."):
@@ -199,7 +208,7 @@ if fetch_clicked:
                     st.session_state.cf_data = get_codeforces_data(cf_handle)
                 except Exception as e:
                     st.session_state.cf_data = None
-                    st.sidebar.error(f"Codeforces fetch failed: {e}")
+                    st.error(f"Codeforces fetch failed: {e}")
 
         if lc_username:
             with st.spinner(f"Fetching LeetCode data for '{lc_username}'..."):
@@ -207,14 +216,14 @@ if fetch_clicked:
                     st.session_state.lc_data = get_leetcode_data(lc_username)
                 except Exception as e:
                     st.session_state.lc_data = None
-                    st.sidebar.error(f"LeetCode fetch failed: {e}")
+                    st.error(f"LeetCode fetch failed: {e}")
 
             with st.spinner(f"Fetching LeetCode contest history for '{lc_username}'..."):
                 try:
                     st.session_state.lc_contest_data = get_leetcode_contest_data(lc_username)
                 except Exception as e:
                     st.session_state.lc_contest_data = None
-                    st.sidebar.error(f"LeetCode contest fetch failed: {e}")
+                    st.error(f"LeetCode contest fetch failed: {e}")
 
 cf_data = st.session_state.cf_data
 lc_data = st.session_state.lc_data
